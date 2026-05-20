@@ -1,38 +1,42 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 
-#define SCREEN_WIDTH 128     
-#define SCREEN_HEIGHT 64     
-#define OLED_RESET    -1     
-#define SCREEN_ADDRESS 0x3C  // Very common default screen address
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// ESP32 I2C Pins
+#define SDA_PIN 21
+#define SCL_PIN 22
+
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void setup() {
+
   Serial.begin(115200);
 
-  // Automatically targets D21 (SDA) and D22 (SCL/SCK)
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("OLED failed! Check wires on D21 and D22."));
-    for(;;); 
-  }
-  
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  display.setTextSize(2); // Thick, bold, and easy-to-read font size
-  
-  // Center your name on the layout
-  display.setCursor(15, 25); 
-  
-  // Put your real name inside the quotes right here:
-  display.println("YOUR NAME"); 
+  // Initialize I2C for ESP32
+  Wire.begin(SDA_PIN, SCL_PIN);
 
-  // Push data to the physical screen pixels
-  display.display(); 
+  // Initialize OLED
+  if(!display.begin(0x3C, true)) {
+
+    Serial.println("OLED failed");
+
+    while(1);
+  }
+
+  display.clearDisplay();
+
+  display.setTextSize(2);
+  display.setTextColor(SH110X_WHITE);
+
+  display.setCursor(10, 20);
+  display.println("anay");
+
+  display.display();
 }
 
 void loop() {
-  // Empty loop so your name just stays up on the panel!
-}
 
+}
