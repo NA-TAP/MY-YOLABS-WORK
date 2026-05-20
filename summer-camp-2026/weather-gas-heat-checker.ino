@@ -1,96 +1,72 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include "DHT.h"
+#include <Adafruit_SH110X.h>
 
-#define SCREEN_WIDTH 128 
-#define SCREEN_HEIGHT 64 
-#define OLED_RESET    -1 
-#define SCREEN_ADDRESS 0x3C 
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 
-// Define the analog pin used for power
-#define POWER_PIN_A3 A3
+// ESP32 I2C Pins
+#define SDA_PIN 21
+#define SCL_PIN 22
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// The Chaos Sensor Pins
+#define GAS_PIN  36   // Connected to VP (Analog input)
+#define HEAT_PIN 4    // Connected to D4 (Digital input)
 
-#define DHTPIN 2       
-#define DHTTYPE DHT11  
-#define BUZZER_PIN 8   
-
-const float tempThreshold = 45.0; 
-bool alarmTriggered = false; 
-
-DHT dht(DHTPIN, DHTTYPE);
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void setup() {
-  // CRITICAL: Set up Analog Pin A3 to output 5V power immediately
-  pinMode(POWER_PIN_A3, OUTPUT);
-  digitalWrite(POWER_PIN_A3, HIGH);
-  
-  // Brief delay to let the OLED power up before initializing it
-  delay(100); 
+  Serial.begin(115200);
 
-  Serial.begin(9600);
-  dht.begin();
-  pinMode(BUZZER_PIN, OUTPUT);
+  // Set the chaos pins to listen for hardware inputs
+  pinMode(GAS_PIN, INPUT);
+  pinMode(HEAT_PIN, INPUT);
 
-  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); 
+  // Initialize I2C for ESP32
+  Wire.begin(SDA_PIN, SCL_PIN);
+
+  // Initialize OLED
+  if(!display.begin(0x3C, true)) {
+    Serial.println("OLED failed");
+    while(1);
   }
-  
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
 }
 
 void loop() {
-  delay(2000); 
+  // 1. Read values from the sensors
+  int gasValue = analogRead(GAS_PIN);
+  int heatState = digitalRead(HEAT_PIN); // Returns 1 (HIGH) or 0 (LOW)
 
-  float t = dht.readTemperature();
-
-  if (isnan(t)) {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0,0);
-    display.println("Sensor Error!");
-    display.display();
-    return;
-  }
-
+  // 2. Clear the screen memory
   display.clearDisplay();
+  display.setTextColor(SH110X_WHITE);
+
+  // 3. Print your name header
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.println("TEMP MONITOR");
-  
-  display.setTextSize(2);
-  display.setCursor(0, 20);
-  display.print(t, 1);
-  display.print(" C");
+  display.print("SYSTEM: anay");
+  display.drawFastHLine(0, 10, 128, SH110X_WHITE); // Visual divider line
 
+  // 4. Print Gas Level readings
+  display.setCursor(0, 16);
+  display.print("Gas Signal: ");
+  display.setTextSize(2);
+  display.setCursor(0, 26);
+  display.print(gasValue);
+
+  // 5. Print Heat State at the bottom
   display.setTextSize(1);
   display.setCursor(0, 50);
-  if(alarmTriggered) {
-    display.println("STATUS: LACKING COOLDOWN");
+  display.print("Heat Tracker: ");
+  if (heatState == HIGH) {
+    display.print("HOT!");
   } else {
-    display.println("STATUS: SYSTEM ARMED");
+    display.print("NORMAL");
   }
-  display.display();
 
-  if (t > tempThreshold && !alarmTriggered) {
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setCursor(10, 20);
-    display.println("⚠️ OVERHEAT");
-    display.display();
-    
-    digitalWrite(BUZZER_PIN, HIGH); 
-    delay(2000);                    
-    digitalWrite(BUZZER_PIN, LOW);  
-    
-    alarmTriggered = true;          
-  } 
+  // 6. Force the data onto the glass!
+  display.display();
   
-  else if (t <= tempThreshold && alarmTriggered) {
-    alarmTriggered = false;         
-  }
+  // Wait half a second before looping and updating again
+  delay(500); 
 }
